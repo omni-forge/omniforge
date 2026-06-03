@@ -6,12 +6,20 @@ GDRIVE_REMOTE = "gdrive:omniforge"
 LOCAL_OMNIFORGE = "/kaggle/working/omniforge"
 REPO_URL = "https://github.com/omni-forge/omniforge.git"
 
-RCLONE_CONF = """[gdrive]
+# Load rclone config from Kaggle Secret (recommended) or fallback to embedded
+def load_rclone_conf():
+    kaggle_secret = Path("/kaggle/secrets/RCLONE_CONF")
+    if kaggle_secret.exists():
+        print("[rclone] Loading config from Kaggle Secret")
+        return kaggle_secret.read_text()
+    print("[rclone] WARNING: No Kaggle Secret found. Using embedded config (may be expired)")
+    return """[gdrive]
 type = drive
 scope = drive
-token = {"access_token":"ya29.a0AQvPyIM-zcLlltNq6xkvleBuYx3Laae59iGD0Sx8kkIVBKE7Os7mk-kJDuUJgJTrTPlPB6SYqgDH5G5j1lGwnvQmxIak3JyzC4rKLTz8die6AQBqSFHXnetDW17UNBs1ZkiJs5hHCF0RsvL2hG0uYGmZRUf4fqgY6SD4b7pzgH8va89r4_sDaJmxUY289iQ2hvAk_b0aCgYKAQESARESFQHGX2MippQVMQSGSjTiHVPMnki0FA0206","token_type":"Bearer","refresh_token":"1//03gw5zkUG7lI3CgYIARAAGAMSNwF-L9IrRlauRoGMRfiOXhc06fGu0EBtmnx-wsrTzQ4i191jgEeSd9vJGk3KpHIOMEO732hurDM","expiry":"2026-06-03T04:14:10.029692514Z","expires_in":3599}
 team_drive =
 """
+
+RCLONE_CONF = load_rclone_conf()
 
 def run(cmd):
     print(f"\n[run] {cmd}")
