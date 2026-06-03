@@ -2,9 +2,9 @@
 import os, sys, subprocess, shutil
 from pathlib import Path
 
-GDRIVE_OMNIFORGE = "/root/gdrive/MyDrive/omniforge"
-LOCAL_OMNIFORGE  = "/kaggle/working/omniforge"
-REPO_URL         = "https://github.com/omni-forge/omniforge.git"
+GDRIVE_REMOTE = "gdrive:omniforge"
+LOCAL_OMNIFORGE = "/kaggle/working/omniforge"
+REPO_URL = "https://github.com/omni-forge/omniforge.git"
 
 RCLONE_CONF = """[gdrive]
 type = drive
@@ -17,6 +17,10 @@ def run(cmd):
     print(f"\n[run] {cmd}")
     subprocess.run(cmd, shell=True)
 
+def rclone(cmd):
+    print(f"\n[rclone] {cmd}")
+    subprocess.run(f"rclone {cmd}", shell=True)
+
 def install_dependencies():
     print("\n" + "="*60)
     print("STEP 1: Installing dependencies")
@@ -24,27 +28,24 @@ def install_dependencies():
     run("pip install -q torch transformers tokenizers datasets tqdm fastapi uvicorn sentencepiece huggingface-hub accelerate safetensors requests")
     run("curl https://rclone.org/install.sh | sudo bash || apt-get install -y rclone")
 
-def mount_google_drive():
+def setup_rclone():
     print("\n" + "="*60)
-    print("STEP 2: Mounting Google Drive via rclone")
+    print("STEP 2: Setting up rclone")
     print("="*60)
-    os.makedirs("/root/gdrive", exist_ok=True)
     conf_path = Path("/root/.config/rclone/rclone.conf")
     conf_path.parent.mkdir(parents=True, exist_ok=True)
     conf_path.write_text(RCLONE_CONF)
-    print("[drive] rclone.conf written from embedded config.")
-    run("rclone mount gdrive: /root/gdrive --daemon --no-checksum --transfers=4 --buffer-size=256M &")
-    import time
-    time.sleep(10)
-    if not Path("/root/gdrive/MyDrive").exists():
-        print("[drive] ERROR: Google Drive did not mount correctly.")
-        sys.exit(1)
-    print("[drive] Google Drive mounted successfully.")
-    os.makedirs(GDRIVE_OMNIFORGE, exist_ok=True)
-    os.makedirs(f"{GDRIVE_OMNIFORGE}/checkpoints", exist_ok=True)
-    os.makedirs(f"{GDRIVE_OMNIFORGE}/data/tokenized", exist_ok=True)
-    os.makedirs(f"{GDRIVE_OMNIFORGE}/tokenizer", exist_ok=True)
-    os.makedirs(f"{GDRIVE_OMNIFORGE}/logs", exist_ok=True)
+    print("[rclone] Config written.")
+    result = subprocess.run("rclone lsd gdrive: --max-depth 1", shell=True, capture_output=True)
+    if result.returncode != 0:
+        print("[rclone] WARNING: Could not connect to Google Drive.")
+        print(result.stderr.decode())
+    else:
+        print("[rclone] Google Drive connected successfully!")
+    rclone("mkdir gdrive:omniforge/checkpoints")
+    rclone("mkdir gdrive:omniforge/tokenizer")
+    rclone("mkdir gdrive:omniforge/data/tokenized")
+    rclone("mkdir gdrive:omniforge/logs")
 
 def setup_project():
     print("\n" + "="*60)
@@ -59,35 +60,23 @@ def restore_from_drive():
     print("\n" + "="*60)
     print("STEP 4: Restoring saved progress from Google Drive")
     print("="*60)
-    drive_ckpt = f"{GDRIVE_OMNIFORGE}/checkpoints"
-    local_ckpt = f"{LOCAL_OMNIFORGE}/checkpoints"
-    os.makedirs(local_ckpt, exist_ok=True)
-    if Path(drive_ckpt).exists():
-        run(f"cp -r {drive_ckpt}/. {local_ckpt}/")
-        ckpts = list(Path(local_ckpt).glob("checkpoint_step_*.pt"))
-        if ckpts:
-            latest = max(ckpts, key=lambda p: int(p.stem.split("_")[-1]))
-            print(f"[restore] Resuming from: {latest.name}")
-        else:
-            print("[restore] No checkpoints found. Starting fresh.")
-    drive_tok = f"{GDRIVE_OMNIFORGE}/tokenizer"
-    local_tok = f"{LOCAL_OMNIFORGE}/tokenizer"
-    os.makedirs(local_tok, exist_ok=True)
-    if Path(drive_tok).exists() and any(Path(drive_tok).iterdir()):
-        run(f"cp -r {drive_tok}/. {local_tok}/")
-    drive_data = f"{GDRIVE_OMNIFORGE}/data/tokenized"
-    local_data = f"{LOCAL_OMNIFORGE}/data/tokenized"
-    os.makedirs(local_data, exist_ok=True)
-    for fname in ["train.bin", "val.bin", "test.bin"]:
-        src = f"{drive_data}/{fname}"
-        dst = f"{local_data}/{fname}"
-        if Path(src).exists() and not Path(dst).exists():
-            run(f"cp {src} {dst}")
-    drive_log = f"{GDRIVE_OMNIFORGE}/logs/training_log.csv"
-    local_log = f"{LOCAL_OMNIFORGE}/logs/training_log.csv"
+    os.makedirs(f"{LOCAL_OMNIFORGE}/checkpoints", exist_ok=True)
+    os.makedirs(f"{LOCAL_OMNIFORGE}/tokenizer", exist_ok=True)
+    os.makedirs(f"{LOCAL_OMNIFORGE}/data/tokenized", exist_ok=True)
     os.makedirs(f"{LOCAL_OMNIFORGE}/logs", exist_ok=True)
-    if Path(drive_log).exists():
-        run(f"cp {drive_log} {local_log}")
+    rclone(f"copy gdrive:omniforge/checkpoints {LOCAL_OMNIFORGE}/checkpoints --transfers=4")
+    ckpts = list(Path(f"{LOCAL_OMNIFORGE}/checkpoints").glob("checkpoint_step_*.pt"))
+    if ckpts:
+        latest = max(ckpts, key=lambda p: int(p.stem.split("_")[-1]))
+        print(f"[restore] Resuming from: {latest.name}")
+    else:
+        print("[restore] No checkpoints found. Starting fresh.")
+    rclone(f"copy gdrive:omniforge/tokenizer {LOCAL_OMNIFORGE}/tokenizer --transfers=4")
+    for fname in ["train.bin", "val.bin", "test.bin"]:
+        dst = f"{LOCAL_OMNIFORGE}/data/tokenized/{fname}"
+        if not Path(dst).exists():
+            rclone(f"copy gdrive:omniforge/data/tokenized/{fname} {LOCAL_OMNIFORGE}/data/tokenized/")
+    rclone(f"copy gdrive:omniforge/logs/training_log.csv {LOCAL_OMNIFORGE}/logs/")
 
 def run_data_pipeline():
     train_bin = Path(f"{LOCAL_OMNIFORGE}/data/tokenized/train.bin")
@@ -101,13 +90,12 @@ def run_data_pipeline():
     run("python dataset_cleaner.py")
     run("python deduplicator.py")
     run("python train_tokenizer.py")
-    run(f"cp -r tokenizer/. {GDRIVE_OMNIFORGE}/tokenizer/")
+    rclone(f"copy {LOCAL_OMNIFORGE}/tokenizer gdrive:omniforge/tokenizer --transfers=4")
     run("python prepare_dataset.py")
     for fname in ["train.bin", "val.bin", "test.bin"]:
-        src = f"data/tokenized/{fname}"
-        dst = f"{GDRIVE_OMNIFORGE}/data/tokenized/{fname}"
+        src = f"{LOCAL_OMNIFORGE}/data/tokenized/{fname}"
         if Path(src).exists():
-            run(f"cp {src} {dst}")
+            rclone(f"copy {src} gdrive:omniforge/data/tokenized/")
 
 def run_training():
     print("\n" + "="*60)
@@ -119,8 +107,9 @@ def save_final_state():
     print("\n" + "="*60)
     print("STEP 7: Saving final state to Google Drive")
     print("="*60)
-    run(f"cp -r checkpoints/. {GDRIVE_OMNIFORGE}/checkpoints/")
-    run(f"cp logs/training_log.csv {GDRIVE_OMNIFORGE}/logs/ 2>/dev/null || true")
+    rclone(f"copy {LOCAL_OMNIFORGE}/checkpoints gdrive:omniforge/checkpoints --transfers=4")
+    rclone(f"copy {LOCAL_OMNIFORGE}/logs/training_log.csv gdrive:omniforge/logs/")
+    print("[save] All progress saved to Google Drive.")
 
 def main():
     print("="*60)
@@ -128,7 +117,7 @@ def main():
     print("  Triggered by GitHub Actions")
     print("="*60)
     install_dependencies()
-    mount_google_drive()
+    setup_rclone()
     setup_project()
     restore_from_drive()
     run_data_pipeline()
