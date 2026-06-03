@@ -33,8 +33,9 @@ jobs:
           cd kaggle_dataset
           kaggle datasets version -p . -m "Auto update from GitHub Actions"
 
-      - name: Trigger Kaggle notebook run
+      - name: Trigger Kaggle notebook run (latest version)
         run: |
+          # Trigger the notebook using kernel push (uses latest saved version)
           kaggle kernels push -p kaggle_notebook
           echo "Kaggle training session triggered successfully"
 
@@ -44,3 +45,4 @@ jobs:
           echo "It will run for up to 12 hours automatically"
           echo "Checkpoints are saved to Google Drive"
           echo "This workflow will trigger again tomorrow at 6AM UTC"
+          
