@@ -80,7 +80,7 @@ def restore_from_drive():
 
 def run_data_pipeline():
     train_bin = Path(f"{LOCAL_OMNIFORGE}/data/tokenized/train.bin")
-    if train_bin.exists():
+    if train_bin.exists() and train_bin.stat().st_size > 100:
         print("\n[pipeline] train.bin exists. Skipping data pipeline.")
         return
     print("\n" + "="*60)
