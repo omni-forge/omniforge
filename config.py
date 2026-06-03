@@ -90,8 +90,8 @@ SPECIAL_TOKEN_IDS: Dict[str, int] = {
 # -----------------------------
 # Training settings
 # -----------------------------
-BATCH_SIZE: int = 8
-GRADIENT_ACCUMULATION_STEPS: int = 8
+BATCH_SIZE: int = 4
+GRADIENT_ACCUMULATION_STEPS: int = 16
 LEARNING_RATE: float = 3e-4
 MIN_LEARNING_RATE: float = 1e-5
 WARMUP_STEPS: int = 2000
