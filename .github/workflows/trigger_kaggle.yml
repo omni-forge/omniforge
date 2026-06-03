@@ -1,0 +1,47 @@
+name: Trigger Kaggle Training
+
+on:
+  schedule:
+    # Runs every day at 6:00 AM UTC automatically
+    - cron: '0 6 * * *'
+  # Also lets you trigger it manually from GitHub website
+  workflow_dispatch:
+
+jobs:
+  trigger-kaggle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Kaggle API
+        run: pip install kaggle
+
+      - name: Setup Kaggle credentials
+        run: |
+          mkdir -p ~/.kaggle
+          echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_API_TOKEN }}"}' > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+
+      - name: Push latest code to Kaggle dataset
+        run: |
+          cd kaggle_dataset
+          kaggle datasets version -p . -m "Auto update from GitHub Actions"
+
+      - name: Trigger Kaggle notebook run
+        run: |
+          kaggle kernels push -p kaggle_notebook
+          echo "Kaggle training session triggered successfully"
+
+      - name: Wait and check status
+        run: |
+          echo "Training is now running on Kaggle GPU"
+          echo "It will run for up to 12 hours automatically"
+          echo "Checkpoints are saved to Google Drive"
+          echo "This workflow will trigger again tomorrow at 6AM UTC"
