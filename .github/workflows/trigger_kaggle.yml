@@ -2,9 +2,7 @@ name: Trigger Kaggle Training
 
 on:
   schedule:
-    # Runs every day at 6:00 AM UTC automatically
     - cron: '0 6 * * *'
-  # Also lets you trigger it manually from GitHub website
   workflow_dispatch:
 
 jobs:
@@ -29,8 +27,9 @@ jobs:
           echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_API_TOKEN }}"}' > ~/.kaggle/kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
 
-      - name: Push latest code to Kaggle dataset
+      - name: Save RCLONE_CONF to dataset
         run: |
+          echo "${{ secrets.RCLONE_CONF }}" > kaggle_dataset/rclone.conf
           cd kaggle_dataset
           kaggle datasets version -p . -m "Auto update from GitHub Actions"
 
