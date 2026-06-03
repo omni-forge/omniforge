@@ -36,10 +36,10 @@ def setup_rclone():
     conf_path.parent.mkdir(parents=True, exist_ok=True)
     conf_path.write_text(RCLONE_CONF)
     print("[rclone] Config written.")
-    result = subprocess.run("rclone lsd gdrive: --max-depth 1", shell=True, capture_output=True)
+    result = subprocess.run("rclone lsd gdrive: --max-depth 1", shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         print("[rclone] WARNING: Could not connect to Google Drive.")
-        print(result.stderr.decode())
+        print(result.stderr.strip())
     else:
         print("[rclone] Google Drive connected successfully!")
     rclone("mkdir gdrive:omniforge/checkpoints")

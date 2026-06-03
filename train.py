@@ -78,10 +78,15 @@ def save_checkpoint(model: OmniForge, optimizer: torch.optim.Optimizer,
     }, path)
     print(f"[train] Saved checkpoint: {path}")
     import subprocess
-    subprocess.run(f"rclone copy {path} gdrive:omniforge/checkpoints/", shell=True)
+    result = subprocess.run(f"rclone copy {path} gdrive:omniforge/checkpoints/", shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"[train] UPLOAD ERROR: {result.stderr.strip()}")
+        print("[train] Checkpoint saved locally but NOT on Drive!")
+    else:
+        print(f"[train] Uploaded to Drive: {path.name}")
     all_ckpts = sorted(config.CHECKPOINT_DIR.glob("checkpoint_step_*.pt"), key=lambda p: int(p.stem.split("_")[-1]))
     for old_ckpt in all_ckpts[:-3]:
-        subprocess.run(f"rclone delete gdrive:omniforge/checkpoints/{old_ckpt.name}", shell=True)
+        subprocess.run(f"rclone delete gdrive:omniforge/checkpoints/{old_ckpt.name}", shell=True, capture_output=True)
         old_ckpt.unlink()
     return path
 
