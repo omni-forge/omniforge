@@ -21,7 +21,8 @@ def install_dependencies():
     print("\n" + "="*60)
     print("STEP 1: Installing dependencies")
     print("="*60)
-    run("pip install -q torch transformers tokenizers datasets tqdm fastapi uvicorn sentencepiece huggingface-hub accelerate safetensors requests rclone")
+    run("pip install -q torch transformers tokenizers datasets tqdm fastapi uvicorn sentencepiece huggingface-hub accelerate safetensors requests")
+    run("curl https://rclone.org/install.sh | sudo bash || apt-get install -y rclone")
 
 def mount_google_drive():
     print("\n" + "="*60)
