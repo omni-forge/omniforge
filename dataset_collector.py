@@ -31,7 +31,7 @@ def main():
                         break
                     code = example.get("whole_func_string", "")
                     if code and len(code) > 50:
-                        f.write(json.dumps({"code": code, "language": lang}) + "\n")
+                        f.write(json.dumps({"content": code, "language": lang}) + "\n")
                         count += 1
                         if count % 10000 == 0:
                             print(f"[collector] Collected {count:,} documents...")
