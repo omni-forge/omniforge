@@ -77,6 +77,8 @@ def save_checkpoint(model: OmniForge, optimizer: torch.optim.Optimizer,
         "model_config": model.cfg.__dict__,
     }, path)
     print(f"[train] Saved checkpoint: {path}")
+    import subprocess
+    subprocess.run(f"rclone copy {path} gdrive:omniforge/checkpoints/", shell=True)
     return path
 
 
