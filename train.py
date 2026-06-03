@@ -79,6 +79,11 @@ def save_checkpoint(model: OmniForge, optimizer: torch.optim.Optimizer,
     print(f"[train] Saved checkpoint: {path}")
     import subprocess
     subprocess.run(f"rclone copy {path} gdrive:omniforge/checkpoints/", shell=True)
+    # Keep only latest 3 checkpoints locally and on Drive
+    all_ckpts = sorted(config.CHECKPOINT_DIR.glob("checkpoint_step_*.pt"), key=lambda p: int(p.stem.split("_")[-1]))
+    for old_ckpt in all_ckpts[:-3]:
+        subprocess.run(f"rclone delete gdrive:omniforge/checkpoints/{old_ckpt.name}", shell=True)
+        old_ckpt.unlink()
     return path
 
 
