@@ -167,7 +167,7 @@ def main() -> None:
         accumulated_loss = 0.0
         for _ in range(config.GRADIENT_ACCUMULATION_STEPS):
             x, y = get_batch(train_data, config.BATCH_SIZE, device)
-            with autocast(device_type=device.type, dtype=amp_dtype):
+            with autocast(dtype=amp_dtype):
                 logits = model(x)
                 loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1),
                                        ignore_index=config.PAD_TOKEN_ID)
