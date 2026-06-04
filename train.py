@@ -129,7 +129,7 @@ def download_model_with_retry():
         f"rclone lsf {GDRIVE_MODEL}/config.json 2>/dev/null",
         shell=True, capture_output=True, text=True
     )
-    if result.returncode == 0:
+    if result.returncode == 0 and result.stdout.strip():
         print(f"[model] Found model on Drive! Downloading...")
         MODEL_CACHE.mkdir(parents=True, exist_ok=True)
         subprocess.run(f"rclone copy {GDRIVE_MODEL}/ {MODEL_CACHE}/ --transfers=4", shell=True)
