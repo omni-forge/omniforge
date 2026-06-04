@@ -27,20 +27,13 @@ jobs:
           echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_API_TOKEN }}"}' > ~/.kaggle/kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
 
-      - name: Save RCLONE_CONF to dataset
-        run: |
-          echo "${{ secrets.RCLONE_CONF }}" > kaggle_dataset/rclone.conf
-          cd kaggle_dataset
-          kaggle datasets version -p . -m "Auto update from GitHub Actions"
-
       - name: Trigger Kaggle notebook run
         run: |
           kaggle kernels push -p kaggle_notebook
           echo "Kaggle training session triggered successfully"
 
-      - name: Wait and check status
+      - name: Done
         run: |
           echo "Training is now running on Kaggle GPU"
-          echo "It will run for up to 12 hours automatically"
-          echo "Checkpoints are saved to Google Drive"
-          echo "This workflow will trigger again tomorrow at 6AM UTC"
+          echo "Checkpoints save to Google Drive automatically"
+          echo "Next trigger tomorrow at 6AM UTC"
