@@ -91,7 +91,7 @@ def estimate_loss(model, val_data, device, eval_iters=10):
     losses = []
     for _ in range(eval_iters):
         x, y = get_batch(val_data, BATCH_SIZE, device)
-        with autocast("cuda"):
+        with autocast(device_type="cuda"):
             out = model(input_ids=x, labels=y)
             losses.append(out.loss.item())
     model.train()
@@ -131,7 +131,7 @@ def main():
         accum_loss = 0.0
         for _ in range(GRAD_ACCUM):
             x, y = get_batch(train_data, BATCH_SIZE, device)
-            with autocast("cuda"):
+            with autocast(device_type="cuda"):
                 out = model(input_ids=x, labels=y)
                 loss = out.loss / GRAD_ACCUM
             scaler.scale(loss).backward()
