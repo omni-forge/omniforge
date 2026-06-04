@@ -1,5 +1,5 @@
 {
-  "id": "bethelisrael/omniforge-training",
+  "id": "omniforge/omniforge-training",
   "title": "OmniForge Training",
   "code_file": "omniforge_kaggle.py",
   "language": "python",
@@ -7,7 +7,7 @@
   "is_private": true,
   "enable_gpu": true,
   "enable_internet": true,
-  "dataset_sources": ["bethelisrael/omniforge-project"],
+  "dataset_sources": [],
   "competition_sources": [],
   "kernel_sources": []
 }
