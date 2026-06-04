@@ -50,7 +50,8 @@ def setup_rclone():
     print("="*60)
     conf_path = Path("/root/.config/rclone/rclone.conf")
     conf_path.parent.mkdir(parents=True, exist_ok=True)
-    conf_path.write_text(RCLONE_CONF.strip())
+    token_line = [l for l in RCLONE_CONF.replace(" type = ", "\ntype = ").replace(" scope = ", "\nscope = ").replace(" token = ", "\ntoken = ").replace(" team_drive = ", "\nteam_drive = ").split("\n") if l.strip()]
+    conf_path.write_text("\n".join(token_line) + "\n")
     print(f"[rclone] First 30 chars: {repr(RCLONE_CONF[:30])}")
     print("[rclone] Config written.")
     r = subprocess.run("rclone lsd gdrive: --max-depth 1", shell=True, capture_output=True, text=True)
