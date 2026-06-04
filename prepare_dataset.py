@@ -1,145 +1,93 @@
 #!/usr/bin/env python3
-"""Tokenize, pack, and split OmniForge training data into binary memmap files.
+"""Re-tokenizes deduped dataset using TinyLlama tokenizer."""
 
-Source: ZIP1 (primary). Uses greedy packing, memory-mapped numpy arrays,
-        proper train/val/test splitting.
-"""
-
-import gzip
-import json
-import random
+import gzip, json, random
 from pathlib import Path
-from typing import Dict, List
-
 import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-import config
+MODEL_NAME   = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_DIR     = PROJECT_ROOT / "data"
+INPUT_PATH   = DATA_DIR / "clean" / "deduped_dataset.jsonl.gz"
+OUT_DIR      = DATA_DIR / "tokenized"
+TRAIN_BIN    = OUT_DIR / "train.bin"
+VAL_BIN      = OUT_DIR / "val.bin"
+TEST_BIN     = OUT_DIR / "test.bin"
 
+CONTEXT_LENGTH = 2048
+DTYPE          = np.uint16
+SEED           = 1337
+TRAIN_SPLIT    = 0.95
+VAL_SPLIT      = 0.04
 
-DTYPE = np.uint16
-
-
-def choose_split(rng: random.Random) -> str:
+def choose_split(rng):
     x = rng.random()
-    train, val, _test = config.SPLIT_RATIOS
-    if x < train:
-        return "train"
-    if x < train + val:
-        return "val"
+    if x < TRAIN_SPLIT: return "train"
+    if x < TRAIN_SPLIT + VAL_SPLIT: return "val"
     return "test"
 
+def main():
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"[prepare] Loading tokenizer from {MODEL_NAME} ...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
+    eos_id = tokenizer.eos_token_id
+    pad_id = tokenizer.pad_token_id or eos_id
+    print(f"[prepare] EOS id: {eos_id}  PAD id: {pad_id}")
 
-def append_chunk(split: str, chunk: List[int],
-                 handles: Dict[str, object], token_counts: Dict[str, int],
-                 chunk_counts: Dict[str, int]) -> None:
-    if len(chunk) != config.CONTEXT_LENGTH:
-        raise ValueError(f"Chunk length must be {config.CONTEXT_LENGTH}, got {len(chunk)}")
-    array = np.asarray(chunk, dtype=DTYPE)
-    handles[split].write(array.tobytes(order="C"))
-    token_counts[split] += len(chunk)
-    chunk_counts[split] += 1
-
-
-def main() -> None:
-    config.ensure_directories()
-
-    print("[prepare] Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(str(config.TOKENIZER_OUTPUT_DIR), use_fast=True)
-    eod_id = tokenizer.convert_tokens_to_ids(config.EOD_TOKEN)
-    if eod_id is None or eod_id < 0:
-        raise RuntimeError("EOD token is missing from tokenizer. Train tokenizer first.")
-
-    if config.VOCAB_SIZE > np.iinfo(DTYPE).max + 1:
-        raise RuntimeError("Vocabulary too large for uint16 storage.")
-
-    output_paths = {
-        "train": config.TRAIN_BIN_PATH,
-        "val": config.VAL_BIN_PATH,
-        "test": config.TEST_BIN_PATH,
+    handles = {
+        "train": open(TRAIN_BIN, "wb"),
+        "val":   open(VAL_BIN,   "wb"),
+        "test":  open(TEST_BIN,  "wb"),
     }
+    token_counts = {"train": 0, "val": 0, "test": 0}
+    chunk_counts = {"train": 0, "val": 0, "test": 0}
+    rng = random.Random(SEED)
+    current, current_split = [], None
+    docs = 0
 
-    # Open binary output files
-    handles = {}
-    for split, path in output_paths.items():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        handles[split] = open(path, "wb")
-
-    token_counts: Dict[str, int] = {"train": 0, "val": 0, "test": 0}
-    chunk_counts: Dict[str, int] = {"train": 0, "val": 0, "test": 0}
-    rng = random.Random(config.SEED)
-
-    # Current packing buffer
-    current_chunk: List[int] = []
-    current_chunk_split = None
-    docs_processed = 0
-
-    print("[prepare] Tokenizing and packing dataset...")
-    with gzip.open(config.DEDUPED_DATASET_PATH, "rt", encoding="utf-8") as f:
+    print(f"[prepare] Reading {INPUT_PATH} ...")
+    with gzip.open(INPUT_PATH, "rt", encoding="utf-8") as f:
         for line in tqdm(f, desc="Tokenizing"):
             line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
+            if not line: continue
+            try: record = json.loads(line)
+            except json.JSONDecodeError: continue
             text = record.get("content", "")
-            if not text:
-                continue
-
-            docs_processed += 1
-
-            # Choose split for this document
+            if not text: continue
+            docs += 1
             split = choose_split(rng)
+            tokens = tokenizer.encode(text) + [eos_id]
 
-            # Tokenize document
-            tokens = tokenizer.encode(text)
-            # Append EOD token to mark document boundary
-            tokens.append(eod_id)
+            if current_split and current_split != split and current:
+                while len(current) < CONTEXT_LENGTH: current.append(pad_id)
+                handles[current_split].write(np.asarray(current, dtype=DTYPE).tobytes())
+                token_counts[current_split] += CONTEXT_LENGTH
+                chunk_counts[current_split] += 1
+                current, current_split = [], None
 
-            # If we have a pending chunk from a different split, flush it
-            if current_chunk_split is not None and current_chunk_split != split and current_chunk:
-                # Pad and flush the old chunk
-                while len(current_chunk) < config.CONTEXT_LENGTH:
-                    current_chunk.append(config.PAD_TOKEN_ID)
-                append_chunk(current_chunk_split, current_chunk, handles,
-                             token_counts, chunk_counts)
-                current_chunk = []
-                current_chunk_split = None
+            if current_split is None: current_split = split
 
-            if current_chunk_split is None:
-                current_chunk_split = split
+            for tok in tokens:
+                current.append(tok)
+                if len(current) == CONTEXT_LENGTH:
+                    handles[current_split].write(np.asarray(current, dtype=DTYPE).tobytes())
+                    token_counts[current_split] += CONTEXT_LENGTH
+                    chunk_counts[current_split] += 1
+                    current = []
 
-            # Greedy packing: fill current chunk
-            for token in tokens:
-                current_chunk.append(token)
-                if len(current_chunk) == config.CONTEXT_LENGTH:
-                    append_chunk(current_chunk_split, current_chunk, handles,
-                                 token_counts, chunk_counts)
-                    current_chunk = []
+    if current:
+        while len(current) < CONTEXT_LENGTH: current.append(pad_id)
+        handles[current_split].write(np.asarray(current, dtype=DTYPE).tobytes())
+        token_counts[current_split] += CONTEXT_LENGTH
+        chunk_counts[current_split] += 1
 
-    # Flush remaining tokens
-    if current_chunk:
-        while len(current_chunk) < config.CONTEXT_LENGTH:
-            current_chunk.append(config.PAD_TOKEN_ID)
-        append_chunk(current_chunk_split, current_chunk, handles,
-                     token_counts, chunk_counts)
+    for h in handles.values(): h.close()
 
-    # Close all files
-    for h in handles.values():
-        h.close()
-
-    total_tokens = sum(token_counts.values())
-    print(f"\n[prepare] Done. Processed {docs_processed:,} documents.")
-    print(f"[prepare] Total tokens written: {total_tokens:,}")
-    for split in ["train", "val", "test"]:
-        print(f"[prepare]   {split}: {token_counts[split]:,} tokens "
-              f"({chunk_counts[split]:,} chunks)")
-    print(f"[prepare] Dataset files saved to {config.TOKENIZED_DATA_DIR}")
-
+    print(f"\n[prepare] Done. {docs:,} documents processed.")
+    for s in ["train", "val", "test"]:
+        print(f"[prepare]   {s}: {token_counts[s]:,} tokens ({chunk_counts[s]:,} chunks)")
 
 if __name__ == "__main__":
     main()
