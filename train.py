@@ -117,7 +117,7 @@ def main():
     print(f"[train] Train tokens: {len(train_data):,}")
     print(f"[train] Val tokens: {len(val_data):,}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9,0.95), weight_decay=0.1)
-    scaler = GradScaler(device_type="cuda", enabled=True)
+    scaler = GradScaler(enabled=True)
     start_step, _ = load_checkpoint(model, optimizer, scaler, device)
     init_log()
     model.train()
