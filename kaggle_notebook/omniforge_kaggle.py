@@ -41,11 +41,10 @@ def install_dependencies():
     print("\n" + "="*60)
     print("STEP 1: Installing dependencies")
     print("="*60)
-    run("pip install -q numpy==1.26.4 torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118
-    run("pip install -q transformers==4.36.0 tokenizers tqdm accelerate==0.24.0 safetensors sentencepiece huggingface-hub")")
-    run("pip install -q torch==2.2.0 --index-url https://download.pytorch.org/whl/cu118")
-    run("pip install -q torchvision==0.17.0 --index-url https://download.pytorch.org/whl/cu118")
-    run("curl https://rclone.org/install.sh | sudo bash || apt-get install -y rclone", check=False)
+    # Install PyTorch ecosystem FIRST (pinned versions)
+    run("pip install -q numpy==1.26.4 torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118")
+    # Then install transformers and other packages (won't overwrite torchvision)
+    run("pip install -q transformers==4.36.0 tokenizers tqdm accelerate==0.24.0 safetensors sentencepiece huggingface-hub")
 
 def setup_rclone():
     print("\n" + "="*60)
@@ -88,7 +87,7 @@ def restore_from_drive():
     print("\n" + "="*60)
     print("STEP 4: Restoring from Google Drive")
     print("="*60)
-    for d in ["checkpoints", "data/tokenized", "logs"]:
+    for d in ["checkpoints", "data/tokenized", "logs", "tokenizer"]:
         os.makedirs(f"{LOCAL_OMNIFORGE}/{d}", exist_ok=True)
     rclone(f"copy gdrive:omniforge/checkpoints {LOCAL_OMNIFORGE}/checkpoints --transfers=4")
     ckpts = list(Path(f"{LOCAL_OMNIFORGE}/checkpoints").glob("checkpoint_step_*.pt"))
@@ -101,7 +100,6 @@ def restore_from_drive():
         dst = Path(f"{LOCAL_OMNIFORGE}/data/tokenized/{fname}")
         if not dst.exists() or dst.stat().st_size < 1000:
             rclone(f"copy gdrive:omniforge/data/tokenized/{fname} {LOCAL_OMNIFORGE}/data/tokenized/")
-    # NEW: Restore tokenizer from Drive
     rclone(f"copy gdrive:omniforge/tokenizer {LOCAL_OMNIFORGE}/tokenizer --transfers=4")
     rclone(f"copy gdrive:omniforge/logs/training_log.csv {LOCAL_OMNIFORGE}/logs/")
 
@@ -136,8 +134,10 @@ def save_final_state():
     print("="*60)
     rclone(f"copy {LOCAL_OMNIFORGE}/checkpoints gdrive:omniforge/checkpoints --transfers=4")
     rclone(f"copy {LOCAL_OMNIFORGE}/logs/training_log.csv gdrive:omniforge/logs/")
-    # NEW: Save tokenizer to Drive
     rclone(f"copy {LOCAL_OMNIFORGE}/tokenizer gdrive:omniforge/tokenizer --transfers=4")
+    hf_model_path = Path(f"{LOCAL_OMNIFORGE}/hf_model")
+    if hf_model_path.exists():
+        rclone(f"copy {LOCAL_OMNIFORGE}/hf_model gdrive:omniforge/hf_model --transfers=4")
     r = subprocess.run("rclone lsf gdrive:omniforge/checkpoints/ | sort", shell=True, capture_output=True, text=True)
     if r.returncode == 0:
         files = [f for f in r.stdout.strip().split("\n") if f]
@@ -146,7 +146,7 @@ def save_final_state():
 
 def main():
     print("="*60)
-    print("  OmniForge TinyLlama Fine-tuning on Kaggle")
+    print("  OmniForge DeepSeek-Coder Fine-tuning on Kaggle")
     print("="*60)
     install_dependencies()
     setup_rclone()
