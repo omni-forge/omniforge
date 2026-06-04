@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OmniForge Fine-tuning Script - Fine-tunes TinyLlama-1.1B on code data."""
+"""OmniForge Fine-tuning Script - Fine-tunes DeepSeek-Coder-1.3B on code data."""
 
 import os
 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0"
@@ -9,7 +9,6 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.cuda.amp import GradScaler, autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 PROJECT_ROOT   = Path(__file__).resolve().parent
@@ -19,6 +18,7 @@ DATA_DIR       = PROJECT_ROOT / "data" / "tokenized"
 TRAIN_BIN      = DATA_DIR / "train.bin"
 VAL_BIN        = DATA_DIR / "val.bin"
 LOG_PATH       = LOG_DIR / "training_log.csv"
+HF_MODEL_DIR   = PROJECT_ROOT / "hf_model"
 
 MODEL_NAME     = "deepseek-ai/deepseek-coder-1.3b-base"
 CONTEXT_LENGTH = 2048
@@ -60,11 +60,11 @@ def latest_checkpoint():
     ckpts = sorted(CHECKPOINT_DIR.glob("checkpoint_step_*.pt"), key=lambda p: int(p.stem.split("_")[-1]))
     return ckpts[-1] if ckpts else None
 
-def save_checkpoint(model, optimizer, scaler, step, loss):
+def save_checkpoint(model, optimizer, step, loss):
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     path = CHECKPOINT_DIR / f"checkpoint_step_{step}.pt"
     torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(),
-                "scaler_state_dict": scaler.state_dict(), "step": step, "loss": float(loss)}, path)
+                "step": step, "loss": float(loss)}, path)
     print(f"[train] Saved checkpoint: {path.name}")
     result = subprocess.run(f"rclone copy {path} {GDRIVE_CKPT}/", shell=True, capture_output=True, text=True)
     if result.returncode != 0: print(f"[train] UPLOAD ERROR: {result.stderr.strip()}")
@@ -75,14 +75,13 @@ def save_checkpoint(model, optimizer, scaler, step, loss):
         old.unlink()
     return path
 
-def load_checkpoint(model, optimizer, scaler, device):
+def load_checkpoint(model, optimizer, device):
     ckpt_path = latest_checkpoint()
     if ckpt_path is None: return 0, float("nan")
     print(f"[train] Resuming from: {ckpt_path.name}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-    if "scaler_state_dict" in ckpt: scaler.load_state_dict(ckpt["scaler_state_dict"])
     return int(ckpt.get("step", 0)), float(ckpt.get("loss", float("nan")))
 
 @torch.no_grad()
@@ -91,9 +90,8 @@ def estimate_loss(model, val_data, device, eval_iters=10):
     losses = []
     for _ in range(eval_iters):
         x, y = get_batch(val_data, BATCH_SIZE, device)
-        with autocast(device_type="cuda"):
-            out = model(input_ids=x, labels=y)
-            losses.append(out.loss.item())
+        out = model(input_ids=x, labels=y)
+        losses.append(out.loss.item())
     model.train()
     return float(np.mean(losses))
 
@@ -119,8 +117,7 @@ def main():
     print(f"[train] Train tokens: {len(train_data):,}")
     print(f"[train] Val tokens: {len(val_data):,}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9,0.95), weight_decay=0.1)
-    scaler = GradScaler("cuda", enabled=True)
-    start_step, _ = load_checkpoint(model, optimizer, scaler, device)
+    start_step, _ = load_checkpoint(model, optimizer, device)
     init_log()
     model.train()
     t0 = time.time()
@@ -131,14 +128,12 @@ def main():
         accum_loss = 0.0
         for _ in range(GRAD_ACCUM):
             x, y = get_batch(train_data, BATCH_SIZE, device)
-            with autocast(device_type="cuda"):
-                out = model(input_ids=x, labels=y)
-                loss = out.loss / GRAD_ACCUM
-            scaler.scale(loss).backward()
+            out = model(input_ids=x, labels=y)
+            loss = out.loss / GRAD_ACCUM
+            loss.backward()
             accum_loss += loss.item()
-        scaler.unscale_(optimizer)
         torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
-        scaler.step(optimizer); scaler.update()
+        optimizer.step()
         elapsed = max(time.time()-t0, 1e-9)
         sps = (step-start_step)/elapsed
         eta_h = (MAX_STEPS-step)/max(sps,1e-9)/3600
@@ -147,8 +142,14 @@ def main():
         val_txt = f" val_loss={val_loss:.4f}" if val_loss else ""
         print(f"[train] step={step:,}/{MAX_STEPS:,} loss={accum_loss:.4f}{val_txt} lr={lr:.2e} sps={sps:.3f} eta={eta_h:.2f}h")
         append_log(step, accum_loss, val_loss, lr, sps, eta_h)
-        if step % SAVE_INTERVAL == 0: save_checkpoint(model, optimizer, scaler, step, accum_loss)
-    save_checkpoint(model, optimizer, scaler, MAX_STEPS, accum_loss)
+        if step % SAVE_INTERVAL == 0: save_checkpoint(model, optimizer, step, accum_loss)
+    save_checkpoint(model, optimizer, MAX_STEPS, accum_loss)
+    print("[train] Saving model in HuggingFace format...")
+    HF_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(HF_MODEL_DIR)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer.save_pretrained(HF_MODEL_DIR)
+    print(f"[train] HuggingFace model saved to {HF_MODEL_DIR}")
     print("[train] Fine-tuning complete.")
 
 if __name__ == "__main__":
