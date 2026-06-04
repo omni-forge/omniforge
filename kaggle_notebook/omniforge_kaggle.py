@@ -70,6 +70,7 @@ def setup_rclone():
     rclone("mkdir gdrive:omniforge/checkpoints", check=False)
     rclone("mkdir gdrive:omniforge/data/tokenized", check=False)
     rclone("mkdir gdrive:omniforge/logs", check=False)
+    rclone("mkdir gdrive:omniforge/tokenizer", check=False)
 
 def setup_project():
     print("\n" + "="*60)
@@ -98,6 +99,8 @@ def restore_from_drive():
         dst = Path(f"{LOCAL_OMNIFORGE}/data/tokenized/{fname}")
         if not dst.exists() or dst.stat().st_size < 1000:
             rclone(f"copy gdrive:omniforge/data/tokenized/{fname} {LOCAL_OMNIFORGE}/data/tokenized/")
+    # NEW: Restore tokenizer from Drive
+    rclone(f"copy gdrive:omniforge/tokenizer {LOCAL_OMNIFORGE}/tokenizer --transfers=4")
     rclone(f"copy gdrive:omniforge/logs/training_log.csv {LOCAL_OMNIFORGE}/logs/")
 
 def run_data_pipeline():
@@ -131,6 +134,8 @@ def save_final_state():
     print("="*60)
     rclone(f"copy {LOCAL_OMNIFORGE}/checkpoints gdrive:omniforge/checkpoints --transfers=4")
     rclone(f"copy {LOCAL_OMNIFORGE}/logs/training_log.csv gdrive:omniforge/logs/")
+    # NEW: Save tokenizer to Drive
+    rclone(f"copy {LOCAL_OMNIFORGE}/tokenizer gdrive:omniforge/tokenizer --transfers=4")
     r = subprocess.run("rclone lsf gdrive:omniforge/checkpoints/ | sort", shell=True, capture_output=True, text=True)
     if r.returncode == 0:
         files = [f for f in r.stdout.strip().split("\n") if f]
