@@ -21,11 +21,12 @@ jobs:
       - name: Install Kaggle API
         run: pip install 'kaggle>=1.6.0'
 
-      - name: Setup Kaggle API Token
+      - name: Setup Kaggle credentials
         run: |
           mkdir -p ~/.kaggle
-          echo "${{ secrets.KAGGLE_API_TOKEN }}" > ~/.kaggle/access_token
-          chmod 600 ~/.kaggle/access_token
+          echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_API_TOKEN }}"}' > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+          echo "Kaggle credentials configured"
 
       - name: Save RCLONE_CONF to dataset
         run: |
