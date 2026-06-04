@@ -112,7 +112,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[train] Device: {device}")
     print(f"[train] Loading {MODEL_NAME} ...")
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16, device_map="auto")
+    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, dtype=torch.float16, device_map="auto")
     print(f"[train] Parameters: {sum(p.numel() for p in model.parameters()):,}")
     train_data = load_memmap(TRAIN_BIN)
     val_data = load_memmap(VAL_BIN)

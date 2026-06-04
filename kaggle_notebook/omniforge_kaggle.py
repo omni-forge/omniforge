@@ -43,6 +43,7 @@ def install_dependencies():
     print("="*60)
     run("pip install -q numpy==1.26.4 transformers tokenizers tqdm accelerate safetensors sentencepiece huggingface-hub")
     run("pip install -q torch==2.2.0 --index-url https://download.pytorch.org/whl/cu118")
+    run("pip install -q torchvision==0.17.0 --index-url https://download.pytorch.org/whl/cu118")
     run("curl https://rclone.org/install.sh | sudo bash || apt-get install -y rclone", check=False)
 
 def setup_rclone():
