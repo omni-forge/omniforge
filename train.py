@@ -9,7 +9,7 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 PROJECT_ROOT   = Path(__file__).resolve().parent
@@ -91,7 +91,7 @@ def estimate_loss(model, val_data, device, eval_iters=10):
     losses = []
     for _ in range(eval_iters):
         x, y = get_batch(val_data, BATCH_SIZE, device)
-        with autocast():
+        with autocast("cuda"):
             out = model(input_ids=x, labels=y)
             losses.append(out.loss.item())
     model.train()
@@ -119,7 +119,7 @@ def main():
     print(f"[train] Train tokens: {len(train_data):,}")
     print(f"[train] Val tokens: {len(val_data):,}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9,0.95), weight_decay=0.1)
-    scaler = GradScaler(enabled=True)
+    scaler = GradScaler("cuda", enabled=True)
     start_step, _ = load_checkpoint(model, optimizer, scaler, device)
     init_log()
     model.train()
@@ -131,7 +131,7 @@ def main():
         accum_loss = 0.0
         for _ in range(GRAD_ACCUM):
             x, y = get_batch(train_data, BATCH_SIZE, device)
-            with autocast():
+            with autocast("cuda"):
                 out = model(input_ids=x, labels=y)
                 loss = out.loss / GRAD_ACCUM
             scaler.scale(loss).backward()
