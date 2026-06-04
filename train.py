@@ -22,8 +22,8 @@ HF_MODEL_DIR   = PROJECT_ROOT / "hf_model"
 
 MODEL_NAME     = "deepseek-ai/deepseek-coder-1.3b-base"
 CONTEXT_LENGTH = 2048
-BATCH_SIZE     = 2
-GRAD_ACCUM     = 32
+BATCH_SIZE     = 1
+GRAD_ACCUM     = 64
 LEARNING_RATE  = 2e-5
 MIN_LR         = 1e-6
 WARMUP_STEPS   = 200
