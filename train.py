@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.amp import GradScaler, autocast
+from torch.cuda.amp import GradScaler, autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 PROJECT_ROOT   = Path(__file__).resolve().parent
