@@ -41,7 +41,7 @@ def install_dependencies():
     print("\n" + "="*60)
     print("STEP 1: Installing dependencies")
     print("="*60)
-    run("pip install -q numpy==1.26.4 torch==2.2.0 transformers tokenizers tqdm accelerate safetensors sentencepiece huggingface-hub")
+    run("pip install -q numpy==1.26.4 transformers tokenizers tqdm accelerate safetensors sentencepiece huggingface-hub")
     run("curl https://rclone.org/install.sh | sudo bash || apt-get install -y rclone", check=False)
 
 def setup_rclone():
