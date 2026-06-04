@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """OmniForge Fine-tuning Script - Fine-tunes TinyLlama-1.1B on code data."""
 
+import os
+os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0"
 import csv, math, random, time, subprocess
 from pathlib import Path
 from typing import Optional
