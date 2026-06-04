@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-MODEL_NAME   = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
+MODEL_NAME   = "deepseek-ai/deepseek-coder-1.3b-base"
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR     = PROJECT_ROOT / "data"
 INPUT_PATH   = DATA_DIR / "clean" / "deduped_dataset.jsonl.gz"

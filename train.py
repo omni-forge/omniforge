@@ -20,7 +20,7 @@ TRAIN_BIN      = DATA_DIR / "train.bin"
 VAL_BIN        = DATA_DIR / "val.bin"
 LOG_PATH       = LOG_DIR / "training_log.csv"
 
-MODEL_NAME     = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
+MODEL_NAME     = "deepseek-ai/deepseek-coder-1.3b-base"
 CONTEXT_LENGTH = 2048
 BATCH_SIZE     = 2
 GRAD_ACCUM     = 32
