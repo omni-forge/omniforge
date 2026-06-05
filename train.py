@@ -200,8 +200,9 @@ def main():
         
         for _ in range(GRAD_ACCUM):
             x, y = get_batch(train_data, BATCH_SIZE, device)
-            out = model(input_ids=x, labels=y)
-            loss = out.loss / GRAD_ACCUM
+            with torch.cuda.amp.autocast():
+                out = model(input_ids=x, labels=y)
+                loss = out.loss / GRAD_ACCUM
             scaler.scale(loss).backward()
             accum_loss += loss.item()
         
