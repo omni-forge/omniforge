@@ -24,9 +24,9 @@ MODEL_CACHE    = Path("/kaggle/working/model_cache")  # Persistent model cache
 
 MODEL_NAME     = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 CONTEXT_LENGTH = 2048
-BATCH_SIZE     = 2
+BATCH_SIZE     = 1
 GRAD_ACCUM     = 8
-LEARNING_RATE  = 2e-5
+LEARNING_RATE  = 2e-6
 MIN_LR         = 1e-6
 WARMUP_STEPS   = 200
 MAX_STEPS      = 10000
