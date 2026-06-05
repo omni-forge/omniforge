@@ -25,7 +25,7 @@ MODEL_CACHE    = Path("/kaggle/working/model_cache")  # Persistent model cache
 MODEL_NAME     = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 CONTEXT_LENGTH = 2048
 BATCH_SIZE     = 1
-GRAD_ACCUM     = 8
+GRAD_ACCUM     = 1
 LEARNING_RATE  = 2e-6
 MIN_LR         = 1e-6
 WARMUP_STEPS   = 200
@@ -177,7 +177,7 @@ def main():
     model_path = download_model_with_retry()
     
     print(f"[train] Loading model from {model_path} ...")
-    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float32).to("cuda")
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map="auto")
     print(f"[train] Parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     train_data = load_memmap(TRAIN_BIN)
