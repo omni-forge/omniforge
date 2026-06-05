@@ -87,11 +87,8 @@ def save_checkpoint(model, optimizer, step, loss):
 def load_checkpoint(model, optimizer, device):
     ckpt_path = latest_checkpoint()
     if ckpt_path is None: return 0, float("nan")
-    print(f"[train] Resuming from: {ckpt_path.name}")
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
-    model.load_state_dict(ckpt["model_state_dict"])
-    optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-    return int(ckpt.get("step", 0)), float(ckpt.get("loss", float("nan")))
+    print(f"[train] Starting fresh (old checkpoint was FP16, incompatible): {ckpt_path.name}")
+    return 0, float("nan")
 
 @torch.no_grad()
 def estimate_loss(model, val_data, device, eval_iters=10):
