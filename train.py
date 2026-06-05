@@ -177,7 +177,7 @@ def main():
     model_path = download_model_with_retry()
     
     print(f"[train] Loading model from {model_path} ...")
-    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float32, device_map="auto")
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map="auto")
     print(f"[train] Parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     train_data = load_memmap(TRAIN_BIN)
@@ -186,6 +186,7 @@ def main():
     print(f"[train] Val tokens: {len(val_data):,}")
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9,0.95), weight_decay=0.1)
+    scaler = torch.cuda.amp.GradScaler()
     start_step, _ = load_checkpoint(model, optimizer, device)
     init_log()
     model.train()
@@ -201,11 +202,11 @@ def main():
             x, y = get_batch(train_data, BATCH_SIZE, device)
             out = model(input_ids=x, labels=y)
             loss = out.loss / GRAD_ACCUM
-            loss.backward()
+            scaler.scale(loss).backward()
             accum_loss += loss.item()
         
         torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
-        optimizer.step()
+        scaler.step(optimizer); scaler.update()
         
         elapsed = max(time.time()-t0, 1e-9)
         sps = (step-start_step)/elapsed
