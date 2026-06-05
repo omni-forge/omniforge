@@ -180,7 +180,7 @@ def main():
     model_path = download_model_with_retry()
     
     print(f"[train] Loading model from {model_path} ...")
-    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map="auto")
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float32, device_map="auto")
     print(f"[train] Parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     train_data = load_memmap(TRAIN_BIN)
